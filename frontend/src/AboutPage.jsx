@@ -166,7 +166,7 @@ export default function AboutPage() {
         muted
         playsInline
         preload = "auto"
-        src="/WebmasterVidBH.mov"
+        src="/vaultbg.mov"
         onEnded={(e) => {
           e.currentTarget.play();
         }}
