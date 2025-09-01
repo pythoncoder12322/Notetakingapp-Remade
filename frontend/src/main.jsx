@@ -1,10 +1,36 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.jsx'
+// src/App.jsx
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { createRoot } from 'react-dom/client';
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
+import AboutPage from './AboutPage'; // ✅ Correct
+import TutorialPage from './TutorialPage'; // ✅ Correct
+import DashboardPage from './Dashboard'; // ✅ Correct
+import AnalyticsPage from './Analytics'; // ✅ Correct
+import MainLayout from './layouts/MainLayout'; // ✅ Correct
+import './index.css';
+
+const App = () => {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<MainLayout />}>
+          <Route index element={<AboutPage />} />
+          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="tutorial" element={<TutorialPage />} />
+          <Route path="analytics" element={<AnalyticsPage />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+};
+
+const root = createRoot(document.getElementById('root'));
+root.render(
+  <React.StrictMode>
     <App />
-  </StrictMode>,
-)
+  </React.StrictMode>
+);
+
+
+export default App;
