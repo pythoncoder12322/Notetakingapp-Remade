@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
 import { FaHeart } from "react-icons/fa";
@@ -19,15 +19,23 @@ import {
 } from 'lucide-react';
 
 const useAuth = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  // Initialize isAuthenticated state from localStorage, defaulting to false
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('isAuthenticated') === 'true';
+  });
+
   const logout = () => {
     console.log('Logging out...');
+    localStorage.removeItem('isAuthenticated');
     setIsAuthenticated(false);
   };
+  
   const login = () => {
     console.log('Logging in...');
+    localStorage.setItem('isAuthenticated', 'true');
     setIsAuthenticated(true);
   };
+  
   return { isAuthenticated, logout, login };
 };
 
@@ -96,8 +104,6 @@ export default function Sidebar() {
                 link.href === '/'
                     ? pathname === '/'
                     : pathname.startsWith(link.href) && link.href !== '/';
-
-
             return (
               <li key={link.name}>
                 <a

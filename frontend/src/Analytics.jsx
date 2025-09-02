@@ -1,5 +1,10 @@
+import FreeformPaperNote from "./components/dashboard/FileEditor";
+
 export default function AnalyticsPage() {
     return (
-        <div>hi</div>
+        <div className="h-screen">
+            <FreeformPaperNote />
+        </div>
     );
 }
+

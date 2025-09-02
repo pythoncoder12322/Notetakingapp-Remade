@@ -1,7 +1,7 @@
 export function CreateMemoryTagModal({ onClose }) {
     return (
-      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-        <div className="bg-gray-900 p-8 rounded-xl shadow-lg max-w-md w-full text-left">
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+        <div className="bg-zinc-900 p-8 rounded-xl shadow-lg shadow-white/20 max-w-md w-full text-left border-1 border-gray-400">
           <h2 className="text-3xl font-extrabold text-orange-400 mb-6">
             Create New Folder
           </h2>
@@ -11,7 +11,7 @@ export function CreateMemoryTagModal({ onClose }) {
           <div className="flex justify-end gap-3 mt-6">
             <button
               onClick={onClose}
-              className="bg-gray-700 hover:bg-gray-600 text-gray-200 font-semibold px-4 py-2 rounded"
+              className="bg-gray-700 hover:bg-gray-600 text-gray-200 font-semibold px-4 py-2 rounded-lg cursor-pointer duration-200"
             >
               Close
             </button>
