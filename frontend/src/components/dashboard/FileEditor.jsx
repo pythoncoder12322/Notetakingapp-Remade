@@ -13,7 +13,6 @@ import {
   ListOrdered,
   Link as LinkIcon,
   Eraser,
-  Download,
   Trash2,
   Copy,
   ArrowUp,
@@ -25,10 +24,8 @@ import {
 } from "lucide-react";
 
 /**
- * FreeformPaperNote (JSX version)
+ * FreeformPaperNote (JSX version) — revised
  */
-
-// ---- Helpers ----
 
 const PAPER_SIZES = {
   letter: { label: "US Letter", width: 816, height: 1056 },
@@ -62,7 +59,6 @@ export default function FreeformPaperNote() {
 
   const paperRef = useRef(null);
   const fileInputRef = useRef(null);
-
   const editorRefs = useRef({});
 
   const size = PAPER_SIZES[paper];
@@ -97,13 +93,26 @@ export default function FreeformPaperNote() {
   );
 
   const setEditorRef = (id) => (el) => {
-    editorRefs.current[id] = el;
+    if (el) {
+      editorRefs.current[id] = el;
+    } else {
+      delete editorRefs.current[id];
+    }
   };
 
   const focusSelectedEditor = () => {
     if (!selectedId) return;
     const el = editorRefs.current[selectedId];
-    if (el) el.focus();
+    if (el) {
+      // move caret to end
+      el.focus();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
   };
 
   // ---- Grid snapping ----
@@ -123,11 +132,13 @@ export default function FreeformPaperNote() {
       w: 260,
       h: 140,
       z: nextZ(items),
-      html: `<div data-placeholder="Type here…" style="min-height: 1.2em;">\n</div>`,
+      // start empty — placeholder handled by data-placeholder on the contentEditable element
+      html: "",
     };
     setItems((prev) => [...prev, item]);
     setSelectedId(id);
-    setTimeout(focusSelectedEditor, 0);
+    // wait a frame then focus the new editor
+    setTimeout(focusSelectedEditor, 50);
   };
 
   const addImageFromFile = (file) => {
@@ -439,8 +450,9 @@ export default function FreeformPaperNote() {
             style={{
               ...pageStyle,
               ...gridBg,
-              transform: `scale(${zoom})`,
-              transformOrigin: "top center",
+              // use CSS zoom instead of transform:scale to avoid contentEditable caret/selection bugs
+              zoom: zoom,
+              transformOrigin: "top left",
             }}
             onMouseDown={(e) => {
               if (e.target === paperRef.current) setSelectedId(null);
@@ -477,36 +489,44 @@ export default function FreeformPaperNote() {
                     bottomLeft: true,
                     bottomRight: true,
                   }}
-                  dragHandleClassName="drag-handle"
+                  // Important: allow dragging except when starting inside .no-drag (our text editors)
+                  cancel=".no-drag"
                   className={`absolute group ${selectedId === item.id ? "ring-2 ring-sky-400" : ""}`}
                   onMouseDown={() => setSelectedId(item.id)}
-                  scale={zoom}
                 >
                   {item.type === "text" ? (
-                    <div className="w-full h-full flex flex-col">
-                      <div className="drag-handle cursor-move bg-stone-50 border-b border-stone-200 px-2 py-1 text-xs text-stone-500 rounded-t-md">
-                        Text box
+                    <div className="w-full h-full flex flex-col relative">
+                      {/* small hover-only drag handle so there's still a way to move text boxes,
+                          but no visible "Text box" header */}
+                      <div
+                        title="Drag"
+                        className="absolute top-2 right-2 w-6 h-6 rounded-md bg-white/80 border border-stone-200 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-grab select-none"
+                        // this element is NOT matched by cancel (no .no-drag), so dragging can start from here
+                      >
+                        <PanelTop className="w-3 h-3 text-sky-500 rotate-45" />
                       </div>
+
                       <div
                         data-editor="true"
+                        data-placeholder="Type here…"
                         ref={setEditorRef(item.id)}
                         contentEditable
                         suppressContentEditableWarning
                         onInput={(e) => onTextInput(item.id, e)}
-                        className="flex-1 outline-none p-2 text-[14px] leading-6 selection:bg-yellow-200/60 prose prose-sm max-w-none overflow-auto"
-                        dangerouslySetInnerHTML={{ __html: item.html }}
+                        className="no-drag flex-1 outline-none p-2 text-[14px] leading-6 selection:bg-yellow-200/60 max-w-none overflow-auto"
+                        dangerouslySetInnerHTML={{ __html: item.html || "" }}
                         onFocus={() => setSelectedId(item.id)}
                         style={{ background: "transparent" }}
                       />
+
                       <div className="absolute inset-0 pointer-events-none rounded-md border border-transparent group-hover:border-sky-300" />
-                      <div className="pointer-events-none absolute bottom-0 right-0 translate-x-1 translate-y-1 opacity-0 group-hover:opacity-100 transition">
-                        <PanelTop className="w-4 h-4 text-sky-400 rotate-45" />
-                      </div>
                     </div>
                   ) : (
-                    <div className="w-full h-full overflow-hidden rounded-md bg-white shadow-sm">
-                      <div className="drag-handle cursor-move bg-stone-50 border-b border-stone-200 px-2 py-1 text-xs text-stone-500">
-                        Image
+                    <div className="w-full h-full overflow-hidden rounded-md bg-white shadow-sm relative">
+                      {/* image container — clicking anywhere on the image will drag it (since img is not .no-drag) */}
+                      <div className="cursor-grab bg-stone-50 border-b border-stone-200 px-2 py-1 text-xs text-stone-500">
+                        {/* keep a subtle, small label only visible on hover (optional) */}
+                        <span className="opacity-0 group-hover:opacity-80 transition">Image</span>
                       </div>
                       <img
                         src={item.src}
@@ -528,14 +548,18 @@ export default function FreeformPaperNote() {
         .paper-shadow { box-shadow: 0 10px 30px rgba(0,0,0,0.08), 0 2px 10px rgba(0,0,0,0.06); }
         .btn-soft { @apply inline-flex items-center gap-1 px-3 py-1.5 rounded-md border bg-white hover:bg-stone-50 active:scale-[0.99] text-sm; }
         .paper { position: relative; }
-        [data-placeholder]:empty:before { content: attr(data-placeholder); color: #9ca3af; }
+        [data-placeholder]:empty:before { content: attr(data-placeholder); color: #9ca3af; display: block; pointer-events: none; }
+        /* keep placeholder lightly padded */
+        [data-placeholder] { min-height: 1.2em; }
+        /* Make sure selection still visible */
+        .no-drag::selection { background: rgba(255, 235, 59, 0.4); }
+
         @media print {
           @page { size: A4 portrait; margin: 10mm; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .paper { transform: scale(1) !important; box-shadow: none !important; }
+          .paper { zoom: 1 !important; box-shadow: none !important; }
           .paper-shadow { box-shadow: none !important; }
-          .drag-handle { display: none !important; }
-          .btn-soft, .border-b, .sticky { display: none !important; }
+          .drag-handle, .btn-soft, .border-b, .sticky { display: none !important; }
         }
       `}</style>
     </div>
