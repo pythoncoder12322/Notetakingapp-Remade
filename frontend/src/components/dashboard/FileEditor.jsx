@@ -442,44 +442,46 @@ export default function FreeformPaperNote() {
       </div>
 
       {/* Workspace */}
-      <div className="flex-1 overflow-auto p-6">
-        <div className="min-h-full w-full flex items-start justify-center">
-          <div
+      <div className="min-h-full w-full flex items-start justify-center">
+        <div
+            style={{
+            transform: `scale(${zoom})`,
+            transformOrigin: "top left",
+            }}
+        >
+            <div
             className="paper-shadow rounded-[12px] border border-stone-300 bg-[#fbfbf8] relative paper print:shadow-none"
             ref={paperRef}
             style={{
-              ...pageStyle,
-              ...gridBg,
-              // use CSS zoom instead of transform:scale to avoid contentEditable caret/selection bugs
-              zoom: zoom,
-              transformOrigin: "top left",
+                ...pageStyle,
+                ...gridBg,
             }}
             onMouseDown={(e) => {
-              if (e.target === paperRef.current) setSelectedId(null);
+                if (e.target === paperRef.current) setSelectedId(null);
             }}
-          >
+            >
             {items
-              .slice()
-              .sort((a, b) => a.z - b.z)
-              .map((item) => (
+                .slice()
+                .sort((a, b) => a.z - b.z)
+                .map((item) => (
                 <Rnd
-                  key={item.id}
-                  bounds="parent"
-                  size={{ width: item.w, height: item.h }}
-                  position={{ x: item.x, y: item.y }}
-                  onDragStop={(_, d) =>
-                    updateItem(item.id, { x: snap(d.x), y: snap(d.y) })
-                  }
-                  onResizeStop={(_, __, ref, ___, pos) =>
+                    key={item.id}
+                    bounds="parent"
+                    size={{ width: item.w, height: item.h }}
+                    position={{ x: item.x, y: item.y }}
+                    onDragStop={(_, d) =>
+                    updateItem(item.id, { x: snap(d.x / zoom), y: snap(d.y / zoom) })
+                    }
+                    onResizeStop={(_, __, ref, ___, pos) =>
                     updateItem(item.id, {
-                      w: snap(ref.offsetWidth),
-                      h: snap(ref.offsetHeight),
-                      x: snap(pos.x),
-                      y: snap(pos.y),
+                        w: snap(ref.offsetWidth / zoom),
+                        h: snap(ref.offsetHeight / zoom),
+                        x: snap(pos.x / zoom),
+                        y: snap(pos.y / zoom),
                     })
-                  }
-                  style={{ zIndex: item.z }}
-                  enableResizing={{
+                    }
+                    style={{ zIndex: item.z }}
+                    enableResizing={{
                     top: true,
                     right: true,
                     bottom: true,
@@ -488,25 +490,14 @@ export default function FreeformPaperNote() {
                     topRight: true,
                     bottomLeft: true,
                     bottomRight: true,
-                  }}
-                  // Important: allow dragging except when starting inside .no-drag (our text editors)
-                  cancel=".no-drag"
-                  className={`absolute group ${selectedId === item.id ? "ring-2 ring-sky-400" : ""}`}
-                  onMouseDown={() => setSelectedId(item.id)}
+                    }}
+                    cancel=".no-drag"
+                    className={`absolute group ${selectedId === item.id ? "ring-2 ring-sky-400" : ""}`}
+                    onMouseDown={() => setSelectedId(item.id)}
                 >
-                  {item.type === "text" ? (
+                    {item.type === "text" ? (
                     <div className="w-full h-full flex flex-col relative">
-                      {/* small hover-only drag handle so there's still a way to move text boxes,
-                          but no visible "Text box" header */}
-                      <div
-                        title="Drag"
-                        className="absolute top-2 right-2 w-6 h-6 rounded-md bg-white/80 border border-stone-200 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-grab select-none"
-                        // this element is NOT matched by cancel (no .no-drag), so dragging can start from here
-                      >
-                        <PanelTop className="w-3 h-3 text-sky-500 rotate-45" />
-                      </div>
-
-                      <div
+                        <div
                         data-editor="true"
                         data-placeholder="Type here…"
                         ref={setEditorRef(item.id)}
@@ -514,35 +505,28 @@ export default function FreeformPaperNote() {
                         suppressContentEditableWarning
                         onInput={(e) => onTextInput(item.id, e)}
                         className="no-drag flex-1 outline-none p-2 text-[14px] leading-6 selection:bg-yellow-200/60 max-w-none overflow-auto"
-                        dangerouslySetInnerHTML={{ __html: item.html || "" }}
                         onFocus={() => setSelectedId(item.id)}
                         style={{ background: "transparent" }}
-                      />
-
-                      <div className="absolute inset-0 pointer-events-none rounded-md border border-transparent group-hover:border-sky-300" />
+                        />
+                        <div className="absolute inset-0 pointer-events-none rounded-md border border-transparent group-hover:border-sky-300" />
                     </div>
-                  ) : (
+                    ) : (
                     <div className="w-full h-full overflow-hidden rounded-md bg-white shadow-sm relative">
-                      {/* image container — clicking anywhere on the image will drag it (since img is not .no-drag) */}
-                      <div className="cursor-grab bg-stone-50 border-b border-stone-200 px-2 py-1 text-xs text-stone-500">
-                        {/* keep a subtle, small label only visible on hover (optional) */}
-                        <span className="opacity-0 group-hover:opacity-80 transition">Image</span>
-                      </div>
-                      <img
+                        <img
                         src={item.src}
                         alt={item.alt || "image"}
                         className="w-full h-[calc(100%-24px)] object-contain bg-white"
                         draggable={false}
                         onMouseDown={() => setSelectedId(item.id)}
-                      />
-                      <div className="absolute inset-0 pointer-events-none rounded-md border border-transparent group-hover:border-sky-300" />
+                        />
+                        <div className="absolute inset-0 pointer-events-none rounded-md border border-transparent group-hover:border-sky-300" />
                     </div>
-                  )}
+                    )}
                 </Rnd>
-              ))}
-          </div>
+                ))}
+            </div>
         </div>
-      </div>
+        </div>
 
       <style>{`
         .paper-shadow { box-shadow: 0 10px 30px rgba(0,0,0,0.08), 0 2px 10px rgba(0,0,0,0.06); }
