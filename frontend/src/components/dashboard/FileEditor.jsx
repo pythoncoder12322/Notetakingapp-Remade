@@ -23,10 +23,6 @@ import {
   PanelTop,
 } from "lucide-react";
 
-/**
- * FreeformPaperNote (JSX version) — revised
- */
-
 const PAPER_SIZES = {
   letter: { label: "US Letter", width: 816, height: 1056 },
   a4: { label: "A4", width: 794, height: 1123 },
@@ -57,11 +53,23 @@ export default function FreeformPaperNote() {
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [gridSize, setGridSize] = useState(12);
 
+  const [supportsCssZoom, setSupportsCssZoom] = useState(true);
+
   const paperRef = useRef(null);
   const fileInputRef = useRef(null);
   const editorRefs = useRef({});
 
   const size = PAPER_SIZES[paper];
+
+  // Detect CSS zoom support (Firefox doesn't support it)
+  useEffect(() => {
+    try {
+      const supported = typeof document !== "undefined" && document.body && "zoom" in document.body.style;
+      setSupportsCssZoom(!!supported);
+    } catch {
+      setSupportsCssZoom(false);
+    }
+  }, []);
 
   // ---- Load & Save ----
   useEffect(() => {
@@ -69,10 +77,8 @@ export default function FreeformPaperNote() {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed && parsed.items && Array.isArray(parsed.items)) {
-          setItems(parsed.items);
-        }
-        if (parsed && parsed.paper) setPaper(parsed.paper);
+        if (parsed?.items) setItems(parsed.items);
+        if (parsed?.paper) setPaper(parsed.paper);
       }
     } catch (e) {
       console.warn("Failed to load saved note", e);
@@ -93,18 +99,14 @@ export default function FreeformPaperNote() {
   );
 
   const setEditorRef = (id) => (el) => {
-    if (el) {
-      editorRefs.current[id] = el;
-    } else {
-      delete editorRefs.current[id];
-    }
+    if (el) editorRefs.current[id] = el;
+    else delete editorRefs.current[id];
   };
 
   const focusSelectedEditor = () => {
     if (!selectedId) return;
     const el = editorRefs.current[selectedId];
     if (el) {
-      // move caret to end
       el.focus();
       const range = document.createRange();
       range.selectNodeContents(el);
@@ -132,12 +134,10 @@ export default function FreeformPaperNote() {
       w: 260,
       h: 140,
       z: nextZ(items),
-      // start empty — placeholder handled by data-placeholder on the contentEditable element
       html: "",
     };
     setItems((prev) => [...prev, item]);
     setSelectedId(id);
-    // wait a frame then focus the new editor
     setTimeout(focusSelectedEditor, 50);
   };
 
@@ -167,9 +167,6 @@ export default function FreeformPaperNote() {
       x: selectedItem.x + 16,
       y: selectedItem.y + 16,
       z: nextZ(items),
-      ...(selectedItem.type === "text"
-        ? { html: selectedItem.html }
-        : { src: selectedItem.src }),
     };
     setItems((prev) => [...prev, copy]);
     setSelectedId(copy.id);
@@ -209,11 +206,9 @@ export default function FreeformPaperNote() {
         e.preventDefault();
         deleteSelected();
       }
-      if (e.metaKey || e.ctrlKey) {
-        if (e.key.toLowerCase() === "d") {
-          e.preventDefault();
-          duplicateSelected();
-        }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        duplicateSelected();
       }
       if (
         ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key) &&
@@ -252,8 +247,7 @@ export default function FreeformPaperNote() {
 
   const addLink = () => {
     const href = prompt("Enter URL:");
-    if (!href) return;
-    applyCmd("createLink", href);
+    if (href) applyCmd("createLink", href);
   };
 
   // ---- Export / Print ----
@@ -262,10 +256,10 @@ export default function FreeformPaperNote() {
   };
 
   // ---- Image handling ----
-  const onPickImage = () => fileInputRef.current && fileInputRef.current.click();
+  const onPickImage = () => fileInputRef.current?.click();
 
   const onFileChange = (e) => {
-    const f = e.target.files && e.target.files[0];
+    const f = e.target.files?.[0];
     if (f) addImageFromFile(f);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -288,6 +282,11 @@ export default function FreeformPaperNote() {
         : {},
     [showGrid, gridSize]
   );
+
+  // Build zoom wrapper style:
+  const zoomWrapperStyle = supportsCssZoom
+    ? { zoom } // preferred: avoids transform bugs in contentEditable
+    : { transform: `scale(${zoom})`, transformOrigin: "top left" }; // Firefox fallback
 
   return (
     <div className="w-full h-full flex flex-col bg-stone-100">
@@ -442,107 +441,110 @@ export default function FreeformPaperNote() {
       </div>
 
       {/* Workspace */}
-      <div className="min-h-full w-full flex items-start justify-center">
-        <div
-            style={{
-            transform: `scale(${zoom})`,
-            transformOrigin: "top left",
-            }}
-        >
+      <div className="flex-1 overflow-auto p-6">
+        <div className="min-h-full w-full flex items-start justify-center">
+          {/* Zoom wrapper: prefer CSS zoom (no transforms) to avoid Chromium caret bugs */}
+          <div style={zoomWrapperStyle}>
             <div
-            className="paper-shadow rounded-[12px] border border-stone-300 bg-[#fbfbf8] relative paper print:shadow-none"
-            ref={paperRef}
-            style={{
+              className="paper-shadow rounded-[12px] border border-stone-300 bg-[#fbfbf8] relative paper print:shadow-none"
+              ref={paperRef}
+              style={{
                 ...pageStyle,
                 ...gridBg,
-            }}
-            onMouseDown={(e) => {
+              }}
+              onMouseDown={(e) => {
                 if (e.target === paperRef.current) setSelectedId(null);
-            }}
+              }}
             >
-            {items
+              {items
                 .slice()
                 .sort((a, b) => a.z - b.z)
                 .map((item) => (
-                <Rnd
+                  <Rnd
                     key={item.id}
                     bounds="parent"
                     size={{ width: item.w, height: item.h }}
                     position={{ x: item.x, y: item.y }}
                     onDragStop={(_, d) =>
-                    updateItem(item.id, { x: snap(d.x / zoom), y: snap(d.y / zoom) })
+                      updateItem(item.id, { x: snap(d.x), y: snap(d.y) })
                     }
                     onResizeStop={(_, __, ref, ___, pos) =>
-                    updateItem(item.id, {
-                        w: snap(ref.offsetWidth / zoom),
-                        h: snap(ref.offsetHeight / zoom),
-                        x: snap(pos.x / zoom),
-                        y: snap(pos.y / zoom),
-                    })
+                      updateItem(item.id, {
+                        w: snap(ref.offsetWidth),
+                        h: snap(ref.offsetHeight),
+                        x: snap(pos.x),
+                        y: snap(pos.y),
+                      })
                     }
                     style={{ zIndex: item.z }}
-                    enableResizing={{
-                    top: true,
-                    right: true,
-                    bottom: true,
-                    left: true,
-                    topLeft: true,
-                    topRight: true,
-                    bottomLeft: true,
-                    bottomRight: true,
-                    }}
+                    enableResizing
                     cancel=".no-drag"
-                    className={`absolute group ${selectedId === item.id ? "ring-2 ring-sky-400" : ""}`}
+                    className={`absolute group ${
+                      selectedId === item.id ? "ring-2 ring-sky-400" : ""
+                    }`}
                     onMouseDown={() => setSelectedId(item.id)}
-                >
+                  >
                     {item.type === "text" ? (
-                    <div className="w-full h-full flex flex-col relative">
+                      <div className="w-full h-full flex flex-col relative">
+                        {/* Drag handle */}
                         <div
-                        data-editor="true"
-                        data-placeholder="Type here…"
-                        ref={setEditorRef(item.id)}
-                        contentEditable
-                        suppressContentEditableWarning
-                        onInput={(e) => onTextInput(item.id, e)}
-                        className="no-drag flex-1 outline-none p-2 text-[14px] leading-6 selection:bg-yellow-200/60 max-w-none overflow-auto"
-                        onFocus={() => setSelectedId(item.id)}
-                        style={{ background: "transparent" }}
+                          title="Drag"
+                          className="absolute top-2 right-2 w-6 h-6 rounded-md bg-white/80 border border-stone-200 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-grab select-none"
+                        >
+                          <PanelTop className="w-3 h-3 text-sky-500 rotate-45" />
+                        </div>
+
+                        <div
+                          data-editor="true"
+                          data-placeholder="Type here…"
+                          ref={setEditorRef(item.id)}
+                          contentEditable
+                          suppressContentEditableWarning
+                          onInput={(e) => onTextInput(item.id, e)}
+                          className="no-drag flex-1 outline-none p-2 text-[14px] leading-6 selection:bg-yellow-200/60 max-w-none overflow-auto"
+                          onFocus={() => setSelectedId(item.id)}
+                          style={{ background: "transparent" }}
                         />
+
                         <div className="absolute inset-0 pointer-events-none rounded-md border border-transparent group-hover:border-sky-300" />
-                    </div>
+                      </div>
                     ) : (
-                    <div className="w-full h-full overflow-hidden rounded-md bg-white shadow-sm relative">
+                      <div className="w-full h-full overflow-hidden rounded-md bg-white shadow-sm relative">
+                        <div className="cursor-grab bg-stone-50 border-b border-stone-200 px-2 py-1 text-xs text-stone-500">
+                          <span className="opacity-0 group-hover:opacity-80 transition">Image</span>
+                        </div>
                         <img
-                        src={item.src}
-                        alt={item.alt || "image"}
-                        className="w-full h-[calc(100%-24px)] object-contain bg-white"
-                        draggable={false}
-                        onMouseDown={() => setSelectedId(item.id)}
+                          src={item.src}
+                          alt={item.alt || "image"}
+                          className="w-full h-[calc(100%)] object-contain bg-white"
+                          draggable={false}
+                          onMouseDown={() => setSelectedId(item.id)}
                         />
                         <div className="absolute inset-0 pointer-events-none rounded-md border border-transparent group-hover:border-sky-300" />
-                    </div>
+                      </div>
                     )}
-                </Rnd>
+                  </Rnd>
                 ))}
             </div>
+          </div>
         </div>
-        </div>
+      </div>
 
       <style>{`
         .paper-shadow { box-shadow: 0 10px 30px rgba(0,0,0,0.08), 0 2px 10px rgba(0,0,0,0.06); }
         .btn-soft { @apply inline-flex items-center gap-1 px-3 py-1.5 rounded-md border bg-white hover:bg-stone-50 active:scale-[0.99] text-sm; }
         .paper { position: relative; }
         [data-placeholder]:empty:before { content: attr(data-placeholder); color: #9ca3af; display: block; pointer-events: none; }
-        /* keep placeholder lightly padded */
         [data-placeholder] { min-height: 1.2em; }
-        /* Make sure selection still visible */
         .no-drag::selection { background: rgba(255, 235, 59, 0.4); }
 
+        /* Ensure printing isn't affected by zoom/transform */
         @media print {
           @page { size: A4 portrait; margin: 10mm; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .paper { zoom: 1 !important; box-shadow: none !important; }
-          .paper-shadow { box-shadow: none !important; }
+          .paper { transform: none !important; }
+          /* zoom is ignored by print, but reset anyway */
+          body, .paper, .paper * { zoom: 1 !important; }
           .drag-handle, .btn-soft, .border-b, .sticky { display: none !important; }
         }
       `}</style>
